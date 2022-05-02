@@ -2,9 +2,8 @@ package com.otto15.client;
 
 import com.otto15.client.listeners.ClientCommandListener;
 import com.otto15.client.listeners.ClientNetworkListener;
-import com.otto15.client.user.UserWorker;
-import com.otto15.common.controllers.CommandListener;
 import com.otto15.common.controllers.CommandManager;
+import com.otto15.common.state.PerformanceState;
 
 
 public final class Client {
@@ -14,15 +13,15 @@ public final class Client {
     }
 
     public static void main(String[] args) {
-        ConnectionHandler connectionHandler = new ConnectionHandler();
+        PerformanceState performanceState = new PerformanceState();
+        ConnectionHandler connectionHandler = new ConnectionHandler(performanceState);
         ClientNetworkListener clientListener = new ClientNetworkListener(connectionHandler);
-        CommandManager.setNetworkListener(clientListener);
-        UserWorker userWorker = new UserWorker();
-        ClientCommandListener commandListener = new ClientCommandListener(userWorker);
-        CommandListener.setOnClient();
+        CommandManager commandManager = new CommandManager(clientListener, performanceState);
+        ClientCommandListener commandListener = new ClientCommandListener(commandManager);
         System.out.println("Salamaleikum!");
         connectionHandler.openConnection();
         commandListener.launch();
+        connectionHandler.close();
     }
 
 }

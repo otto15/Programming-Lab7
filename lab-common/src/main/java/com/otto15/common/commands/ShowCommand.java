@@ -6,14 +6,14 @@ import com.otto15.common.network.Response;
 
 public class ShowCommand extends AbstractCommand {
 
-    public ShowCommand() {
-        super("show", "outputs all collection elements", 0);
+    public ShowCommand(CommandManager commandManager) {
+        super(commandManager, "show", "outputs all collection elements", 0);
     }
 
 
     @Override
     public Response execute(Object[] args) {
-        return new Response(CommandManager.getCollectionManager().show());
+        return new Response(getCommandManager().getCollectionManager().show());
     }
 
 }

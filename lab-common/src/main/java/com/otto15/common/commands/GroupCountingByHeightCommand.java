@@ -8,13 +8,13 @@ import com.otto15.common.network.Response;
  */
 public class GroupCountingByHeightCommand extends AbstractCommand {
 
-    public GroupCountingByHeightCommand() {
-        super("group_counting_by_height", "outputs the number of group members", 0);
+    public GroupCountingByHeightCommand(CommandManager commandManager) {
+        super(commandManager, "group_counting_by_height", "outputs the number of group members", 0);
     }
 
     @Override
     public Response execute(Object[] args) {
-        CommandManager.getCollectionManager().makeGroupsByHeight();
-        return new Response(CommandManager.getCollectionManager().outputGroupsByHeight());
+        getCommandManager().getCollectionManager().makeGroupsByHeight();
+        return new Response(getCommandManager().getCollectionManager().outputGroupsByHeight());
     }
 }

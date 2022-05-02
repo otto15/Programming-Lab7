@@ -20,17 +20,19 @@ import com.otto15.common.commands.SumOfHeightCommand;
 import com.otto15.common.commands.UpdateCommand;
 import com.otto15.common.db.DBWorker;
 import com.otto15.common.entities.User;
+import com.otto15.common.exceptions.EndOfStreamException;
 import com.otto15.common.network.NetworkListener;
 import com.otto15.common.network.Request;
 import com.otto15.common.network.Response;
+import com.otto15.common.state.PerformanceState;
 import com.otto15.common.utils.DataNormalizer;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Manager for commands, responsible for invoking.
@@ -38,88 +40,87 @@ import java.util.Queue;
 public final class CommandManager {
 
     private static final int HISTORY_LENGTH = 10;
-    private static final Queue<String> COMMAND_HISTORY = new LinkedList<>();
-    private static final Map<String, AbstractCommand> CLIENT_COMMANDS = new HashMap<>();
-    private static final Map<String, AbstractCommand> SERVER_COMMANDS = new HashMap<>();
-    private static final Map<String, AbstractCommand> COMMANDS_EXECUTING_WITHOUT_SENDING = new HashMap<>();
-    private static final Map<String, AbstractCommand> COMMANDS_WITHOUT_AUTH = new HashMap<>();
-    private static NetworkListener networkListener;
-    private static CollectionManager collectionManager;
-    private static DBWorker dbWorker;
+    private final Queue<String> commandHistory = new ConcurrentLinkedQueue<>();
+    private final Map<String, AbstractCommand> clientCommands = new HashMap<>();
+    private final Map<String, AbstractCommand> serverCommands = new HashMap<>();
+    private final Map<String, AbstractCommand> commandsSendingWithoutSending = new HashMap<>();
+    private final Map<String, AbstractCommand> commandsWithoutAuth = new HashMap<>();
+    private final PerformanceState performanceState;
+    private NetworkListener networkListener;
+    private CollectionManager collectionManager;
+    private DBWorker dbWorker;
 
-    private CommandManager() {
-
+    public CommandManager(CollectionManager collectionManager, DBWorker dbWorker, PerformanceState performanceState) {
+        this.performanceState = performanceState;
+        this.collectionManager = collectionManager;
+        this.dbWorker = dbWorker;
     }
 
-    static {
-        CLIENT_COMMANDS.put("add", new AddCommand());
-        CLIENT_COMMANDS.put("add_if_min", new AddIfMinCommand());
-        CLIENT_COMMANDS.put("clear", new ClearCommand());
-        CLIENT_COMMANDS.put("exit", new ExitCommand());
-        CLIENT_COMMANDS.put("history", new HistoryCommand());
-        CLIENT_COMMANDS.put("info", new InfoCommand());
-        CLIENT_COMMANDS.put("remove_any_by_height", new RemoveAnyByHeightCommand());
-        CLIENT_COMMANDS.put("remove_by_id", new RemoveByIdCommand());
-        CLIENT_COMMANDS.put("remove_greater", new RemoveGreaterCommand());
-        CLIENT_COMMANDS.put("sum_of_height", new SumOfHeightCommand());
-        CLIENT_COMMANDS.put("update", new UpdateCommand());
-        CLIENT_COMMANDS.put("group_counting_by_height", new GroupCountingByHeightCommand());
-        CLIENT_COMMANDS.put("execute_script", new ExecuteScriptCommand());
-        CLIENT_COMMANDS.put("help", new HelpCommand());
-        CLIENT_COMMANDS.put("show", new ShowCommand());
-        CLIENT_COMMANDS.put("sign_in", new SignInCommand());
-        CLIENT_COMMANDS.put("sign_up", new SignUpCommand());
-
-        SERVER_COMMANDS.put("exit", new ExitCommand());
-
-        COMMANDS_EXECUTING_WITHOUT_SENDING.putAll(SERVER_COMMANDS);
-        COMMANDS_EXECUTING_WITHOUT_SENDING.put("execute_script", new ExecuteScriptCommand());
-
-        COMMANDS_WITHOUT_AUTH.put("sign_in", new SignInCommand());
-        COMMANDS_WITHOUT_AUTH.put("sign_up", new SignUpCommand());
-        COMMANDS_WITHOUT_AUTH.put("exit", new ExitCommand());
+    public CommandManager(NetworkListener networkListener, PerformanceState performanceState) {
+        this.performanceState = performanceState;
+        this.networkListener = networkListener;
     }
 
-    public static Map<String, AbstractCommand> getCommandsWithoutAuth() {
-        return COMMANDS_WITHOUT_AUTH;
+    {
+        serverCommands.put("exit", new ExitCommand(this));
+
+        commandsSendingWithoutSending.putAll(serverCommands);
+        commandsSendingWithoutSending.put("execute_script", new ExecuteScriptCommand(this));
+
+        commandsWithoutAuth.putAll(serverCommands);
+        commandsWithoutAuth.put("sign_in", new SignInCommand(this));
+        commandsWithoutAuth.put("sign_up", new SignUpCommand(this));
+        commandsWithoutAuth.put("help", new HelpCommand(this));
+
+        clientCommands.putAll(serverCommands);
+        clientCommands.putAll(commandsSendingWithoutSending);
+        clientCommands.putAll(commandsWithoutAuth);
+        clientCommands.put("add", new AddCommand(this));
+        clientCommands.put("add_if_min", new AddIfMinCommand(this));
+        clientCommands.put("clear", new ClearCommand(this));
+        clientCommands.put("history", new HistoryCommand(this));
+        clientCommands.put("info", new InfoCommand(this));
+        clientCommands.put("remove_any_by_height", new RemoveAnyByHeightCommand(this));
+        clientCommands.put("remove_by_id", new RemoveByIdCommand(this));
+        clientCommands.put("remove_greater", new RemoveGreaterCommand(this));
+        clientCommands.put("sum_of_height", new SumOfHeightCommand(this));
+        clientCommands.put("update", new UpdateCommand(this));
+        clientCommands.put("group_counting_by_height", new GroupCountingByHeightCommand(this));
+        clientCommands.put("show", new ShowCommand(this));
     }
 
-    public static void setCollectionManager(CollectionManager collectionManager) {
-        CommandManager.collectionManager = collectionManager;
+    public PerformanceState getPerformanceState() {
+        return performanceState;
     }
 
-    public static void setDbWorker(DBWorker dbWorker) {
-        CommandManager.dbWorker = dbWorker;
+    public synchronized Map<String, AbstractCommand> getCommandsWithoutAuth() {
+        return commandsWithoutAuth;
     }
 
-    public static DBWorker getDBWorker() {
+    public DBWorker getDBWorker() {
         return dbWorker;
     }
 
-    public static CollectionManager getCollectionManager() {
+    public CollectionManager getCollectionManager() {
         return collectionManager;
     }
 
-    public static void setNetworkListener(NetworkListener networkListener) {
-        CommandManager.networkListener = networkListener;
-    }
-
-    public static NetworkListener getNetworkListener() {
+    public NetworkListener getNetworkListener() {
         return networkListener;
     }
 
-    public static Map<String, AbstractCommand> getCommands() {
-        return CLIENT_COMMANDS;
+    public Map<String, AbstractCommand> getCommands() {
+        return clientCommands;
     }
 
-    public static Queue<String> getCommandHistory() {
-        return COMMAND_HISTORY;
+    public Queue<String> getCommandHistory() {
+        return commandHistory;
     }
 
-    public static void addCommandToHistory(String commandName) {
-        COMMAND_HISTORY.add(commandName);
-        if (COMMAND_HISTORY.size() > HISTORY_LENGTH) {
-            COMMAND_HISTORY.poll();
+    public void addCommandToHistory(String commandName) {
+        commandHistory.add(commandName);
+        if (commandHistory.size() > HISTORY_LENGTH) {
+            commandHistory.poll();
         }
     }
 
@@ -128,43 +129,49 @@ public final class CommandManager {
      *
      * @param inputData data from listener
      */
-    public static Response onCommandReceived(String inputData, User user) {
-        boolean fromClient = CommandListener.isOnClient();
-        Map<String, AbstractCommand> commands = SERVER_COMMANDS;
+    public Response onCommandReceived(String inputData, boolean fromClient, User user) {
+        Map<String, AbstractCommand> commands = serverCommands;
         if (fromClient) {
-            commands = CLIENT_COMMANDS;
+            commands = clientCommands;
         }
         String[] commandWithRawArgs = DataNormalizer.normalize(inputData);
         String commandName = commandWithRawArgs[0].toLowerCase(Locale.ROOT);
         String[] rawArgs = Arrays.copyOfRange(commandWithRawArgs, 1, commandWithRawArgs.length);
         if (commands.containsKey(commandName)) {
             AbstractCommand command = commands.get(commandName);
-            return processCommand(command, rawArgs, user);
+            try {
+                return processCommand(command, rawArgs, user);
+            } catch (EndOfStreamException e) {
+                performanceState.switchPerformanceStatus();
+            }
+
         }
         return new Response("No such command, call \"help\" to see the list of commands.");
     }
 
-    public static Response processCommand(AbstractCommand command, String[] rawArgs, User user) {
+    public Response processCommand(AbstractCommand command, String[] rawArgs, User user) throws EndOfStreamException {
         if (rawArgs.length == command.getInlineArgsCount()) {
             Object[] rawArgsAndUser = new Object[rawArgs.length + 1];
             System.arraycopy(rawArgs, 0, rawArgsAndUser, 0, rawArgs.length);
             rawArgsAndUser[rawArgsAndUser.length - 1] = user;
+
             Object[] commandArgs = command.readArgs(rawArgsAndUser);
             if (commandArgs != null) {
-                if (COMMANDS_EXECUTING_WITHOUT_SENDING.containsKey(command.getName())) {
+                if (commandsSendingWithoutSending.containsKey(command.getName())) {
                     return executeCommand(command, commandArgs);
                 } else {
                     return networkListener.listen(new Request(command, commandArgs));
                 }
             }
+
         } else {
             return new Response("Wrong number of arguments.");
         }
         return null;
     }
 
-    public static Response executeCommand(AbstractCommand command, Object[] args) {
-        CommandManager.addCommandToHistory(command.getName());
+    public Response executeCommand(AbstractCommand command, Object[] args) {
+        addCommandToHistory(command.getName());
         return command.execute(args);
     }
 

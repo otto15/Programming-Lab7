@@ -1,15 +1,19 @@
 package com.otto15.client;
 
 
+import com.otto15.common.exceptions.EndOfStreamException;
+import com.otto15.common.io.DataReader;
+import com.otto15.common.state.PerformanceState;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.util.InputMismatchException;
-import java.util.Scanner;
 
 public final class ConnectionHandler {
 
+    private final PerformanceState performanceState;
     private Socket socket;
     private boolean isOpen = false;
     private InputStream inputStream;
@@ -18,7 +22,8 @@ public final class ConnectionHandler {
     private int lastPort = 0;
 
 
-    public ConnectionHandler() {
+    public ConnectionHandler(PerformanceState performanceState) {
+        this.performanceState = performanceState;
     }
 
     public int getLastPort() {
@@ -42,10 +47,14 @@ public final class ConnectionHandler {
     }
 
     public void openConnection() {
-        while (true) {
-            if (openConnection(inputAddress(), inputPort()) > 0) {
-                return;
+        try {
+            while (true) {
+                if (openConnection(inputAddress(), inputPort()) > 0) {
+                    return;
+                }
             }
+        } catch (IOException | EndOfStreamException e) {
+            performanceState.switchPerformanceStatus();
         }
     }
 
@@ -66,20 +75,21 @@ public final class ConnectionHandler {
         }
     }
 
-    private int inputPort() {
+    private int inputPort() throws EndOfStreamException, IOException {
         try {
+            DataReader reader = new DataReader(new InputStreamReader(System.in));
             System.out.println("Enter port:");
-            Scanner sc = new Scanner(System.in);
-            return sc.nextInt();
-        } catch (InputMismatchException e) {
+            return Integer.parseInt(reader.inputLine());
+        } catch (NumberFormatException e) {
             return 0;
         }
     }
 
-    private String inputAddress() {
+    private String inputAddress() throws EndOfStreamException, IOException {
+        DataReader reader = new DataReader(new InputStreamReader(System.in));
         System.out.println("Enter address:");
-        Scanner sc = new Scanner(System.in);
-        return sc.nextLine();
+        return reader.inputLine();
+
     }
 
     public boolean isOpen() {

@@ -9,14 +9,14 @@ import java.util.Objects;
 
 public class FindByIdCommand extends AbstractCommand {
 
-    public FindByIdCommand() {
-        super("", "", 0);
+    public FindByIdCommand(CommandManager commandManager) {
+        super(commandManager, "", "", 0);
     }
 
     @Override
     public Response execute(Object[] args) {
         User user = (User) args[1];
-        Person foundPerson = CommandManager.getCollectionManager().findById((Long) args[0]);
+        Person foundPerson = getCommandManager().getCollectionManager().findById((Long) args[0]);
         if (foundPerson.getId() == -1) {
             return new Response((String) null);
         }

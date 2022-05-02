@@ -17,10 +17,11 @@ public class DBInitializer {
     }
 
     private void addConstantsToTable(Connection connection, String insertQuery, Object[] rows) throws SQLException {
-        for (Object row: rows) {
-            PreparedStatement addConstantToTable = connection.prepareStatement(insertQuery);
-            addConstantToTable.setString(1, row.toString());
-            addConstantToTable.execute();
+        for (Object row : rows) {
+            try (PreparedStatement addConstantToTable = connection.prepareStatement(insertQuery);) {
+                addConstantToTable.setString(1, row.toString());
+                addConstantToTable.execute();
+            }
         }
     }
 
@@ -28,17 +29,18 @@ public class DBInitializer {
 
         try (
                 Connection connection = dbConnector.connect();
+                PreparedStatement createUsersTable = connection.prepareStatement(DBQuery.CREATE_USERS_TABLE.getQuery());
+                PreparedStatement createColorsTable = connection.prepareStatement(DBQuery.CREATE_COLORS_TABLE.getQuery());
+                PreparedStatement createCountriesTable = connection.prepareStatement(DBQuery.CREATE_COUNTRIES_TABLE.getQuery());
+                PreparedStatement createLocationsTable = connection.prepareStatement(DBQuery.CREATE_LOCATIONS_TABLE.getQuery());
+                PreparedStatement createPersonsTable = connection.prepareStatement(DBQuery.CREATE_PERSONS_TABLE.getQuery());
         ) {
-            PreparedStatement createUsersTable = connection.prepareStatement(DBQuery.CREATE_USERS_TABLE.getQuery());
-            PreparedStatement createColorsTable = connection.prepareStatement(DBQuery.CREATE_COLORS_TABLE.getQuery());
-            PreparedStatement createCountriesTable = connection.prepareStatement(DBQuery.CREATE_COUNTRIES_TABLE.getQuery());
-            PreparedStatement createLocationsTable = connection.prepareStatement(DBQuery.CREATE_LOCATIONS_TABLE.getQuery());
-            PreparedStatement createPersonsTable = connection.prepareStatement(DBQuery.CREATE_PERSONS_TABLE.getQuery());
 
-            createUsersTable.execute();
+
             createColorsTable.execute();
             createCountriesTable.execute();
             createLocationsTable.execute();
+            createUsersTable.execute();
             createPersonsTable.execute();
 
             addConstantsToTable(connection, DBQuery.INSERT_CONSTANT_ROW_TO_COLORS.getQuery(), Color.values());

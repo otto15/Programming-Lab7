@@ -19,6 +19,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -33,9 +34,9 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public long addPerson(Person person, User user) {
-        try (Connection connection = dbConnector.connect();) {
-            PreparedStatement addPersonToTable = connection.prepareStatement(DBQuery.INSERT_PERSON.getQuery());
+    public synchronized long addPerson(Person person, User user) {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement addPersonToTable = connection.prepareStatement(DBQuery.INSERT_PERSON.getQuery());) {
             int paramCounter = 1;
             paramCounter = fillStatementWithPersonData(addPersonToTable, person, paramCounter);
             addPersonToTable.setTimestamp(paramCounter++, Timestamp.from(person.getCreationDate().toInstant()));
@@ -55,9 +56,9 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public long addUser(User user) {
-        try (Connection connection = dbConnector.connect();) {
-            PreparedStatement addUserToTable = connection.prepareStatement(DBQuery.INSERT_USER.getQuery());
+    public synchronized long addUser(User user) {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement addUserToTable = connection.prepareStatement(DBQuery.INSERT_USER.getQuery());) {
             addUserToTable.setString(1, user.getLogin());
             addUserToTable.setString(2, encryptor.encrypt(user.getPassword()));
 
@@ -74,9 +75,10 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public long checkUser(User user) {
-        try (Connection connection = dbConnector.connect();) {
-            PreparedStatement checkUser = connection.prepareStatement(DBQuery.SELECT_USER_BY_LOGIN_AND_PASSWORD.getQuery());
+    public synchronized long checkUser(User user) {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement checkUser = connection.prepareStatement(DBQuery.SELECT_USER_BY_LOGIN_AND_PASSWORD.getQuery());
+        ) {
             checkUser.setString(1, user.getLogin());
             checkUser.setString(2, encryptor.encrypt(user.getPassword()));
 
@@ -94,10 +96,10 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public long updatePerson(Person person) {
-        try (Connection connection = dbConnector.connect()) {
-            PreparedStatement updatePerson = connection.prepareStatement(DBQuery.UPDATE_PERSON.getQuery());
-
+    public synchronized long updatePerson(Person person) {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement updatePerson = connection.prepareStatement(DBQuery.UPDATE_PERSON.getQuery());
+        ) {
             int paramCounter = 1;
             paramCounter = fillStatementWithPersonData(updatePerson, person, paramCounter);
             updatePerson.setLong(paramCounter, person.getId());
@@ -113,10 +115,10 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public long deletePersonsByUser(User user) {
-        try (Connection connection = dbConnector.connect()) {
-            PreparedStatement deletePersonByUser = connection.prepareStatement(DBQuery.DELETE_PERSONS_BY_AUTHOR.getQuery());
-
+    public synchronized long deletePersonsByUser(User user) {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement deletePersonByUser = connection.prepareStatement(DBQuery.DELETE_PERSONS_BY_AUTHOR.getQuery());
+        ) {
             deletePersonByUser.setString(1, user.getLogin());
 
             return deletePersonByUser.executeUpdate();
@@ -127,9 +129,9 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public long deletePersonById(long personId) {
-        try (Connection connection = dbConnector.connect()) {
-            PreparedStatement deletePersonById = connection.prepareStatement(DBQuery.DELETE_PERSON_BY_ID.getQuery());
+    public synchronized long deletePersonById(long personId) {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement deletePersonById = connection.prepareStatement(DBQuery.DELETE_PERSON_BY_ID.getQuery());) {
             deletePersonById.setLong(1, personId);
             return deletePersonById.executeUpdate();
         } catch (SQLException e) {
@@ -139,9 +141,10 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     @Override
-    public Set<Person> selectAllPersons() {
-        try (Connection connection = dbConnector.connect()) {
-            PreparedStatement selectAllPersons = connection.prepareStatement(DBQuery.SELECT_ALL_PERSONS.getQuery());
+    public synchronized Set<Person> selectAllPersons() {
+        try (Connection connection = dbConnector.connect();
+             PreparedStatement selectAllPersons = connection.prepareStatement(DBQuery.SELECT_ALL_PERSONS.getQuery());
+        ) {
             ResultSet resultSet = selectAllPersons.executeQuery();
             return parsePersonsFromResultSet(resultSet);
         } catch (SQLException e) {
@@ -151,7 +154,7 @@ public class DBWorkerImpl implements DBWorker {
     }
 
     private Set<Person> parsePersonsFromResultSet(ResultSet resultSet) throws SQLException {
-        Set<Person> personSet = new HashSet<>();
+        Set<Person> personSet = Collections.synchronizedSet(new HashSet<>());
         while (resultSet.next()) {
             Person person = new Person();
             person.setId(resultSet.getLong("person_id"));

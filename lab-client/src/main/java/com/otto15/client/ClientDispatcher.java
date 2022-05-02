@@ -12,18 +12,20 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class ClientDispatcher {
+public class ClientDispatcher {
 
+    private final Serializer serializer;
 
-    private ClientDispatcher() {
+    public ClientDispatcher(Serializer serializer) {
+        this.serializer = serializer;
     }
 
-    public static void send(Request request, OutputStream outputStream) throws IOException {
-        byte[] bytes = Serializer.serialize(request);
+    public void send(Request request, OutputStream outputStream) throws IOException {
+        byte[] bytes = serializer.serialize(request);
         outputStream.write(bytes);
     }
 
-    public static Response receive(InputStream inputStream, int bufferSize) throws IOException {
+    public Response receive(InputStream inputStream, int bufferSize) throws IOException {
         ByteBuffer mainBuffer = ByteBuffer.allocate(0);
         while (true) {
             byte[] bytesToDeserialize = new byte[bufferSize];
@@ -36,7 +38,7 @@ public final class ClientDispatcher {
             newBuffer.put(mainBuffer);
             newBuffer.put(ByteBuffer.wrap(bytesToDeserialize, 0, bytesCount));
             mainBuffer = ByteBuffer.wrap(newBuffer.array());
-            Response response = (Response) Serializer.deserialize(mainBuffer.array());
+            Response response = (Response) serializer.deserialize(mainBuffer.array());
             if (response == null) {
                 List<ByteBuffer> buffers = new ArrayList<>();
                 int bytesLeft = bis.available();
@@ -52,7 +54,7 @@ public final class ClientDispatcher {
                 newBuffer.put(mainBuffer);
                 buffers.forEach(newBuffer::put);
                 mainBuffer = ByteBuffer.wrap(newBuffer.array());
-                response = (Response) Serializer.deserialize(mainBuffer.array());
+                response = (Response) serializer.deserialize(mainBuffer.array());
             }
             if (response != null) {
                 return response;

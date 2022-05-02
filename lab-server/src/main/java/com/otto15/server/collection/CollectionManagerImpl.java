@@ -2,7 +2,7 @@ package com.otto15.server.collection;
 
 import com.otto15.common.controllers.CollectionManager;
 import com.otto15.common.entities.Person;
-import com.otto15.common.entities.validators.EntityValidator;
+
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -19,9 +19,8 @@ import java.util.stream.Collectors;
  * @author Rakhmatullin R.
  */
 public class CollectionManagerImpl implements CollectionManager {
-    private Long currentID = 1L; //Поле не может быть null, Значение поля должно быть больше 0, Значение этого поля должно быть уникальным, Значение этого поля должно генерироваться автоматически
-    private Set<Person> persons;
-    private ZonedDateTime creationDate = ZonedDateTime.now();
+    private final ZonedDateTime creationDate = ZonedDateTime.now();
+    private final Set<Person> persons;
     private Map<Long, List<Person>> groupsByHeight;
 
     public CollectionManagerImpl(Set<Person> persons) {
@@ -33,21 +32,9 @@ public class CollectionManagerImpl implements CollectionManager {
         return persons;
     }
 
-    public ZonedDateTime getCreationDate() {
-        return creationDate;
-    }
-
-    public void setCreationDate() {
-        creationDate = ZonedDateTime.now();
-    }
-
-    public void setPersonSet(Set<Person> personSet) {
-        this.persons = personSet;
-    }
 
     @Override
     public void add(Person newPerson) {
-        newPerson.setId(currentID++);
         persons.add(newPerson);
     }
 
@@ -61,7 +48,6 @@ public class CollectionManagerImpl implements CollectionManager {
         return persons.stream()
                 .sorted((person1, person2) -> person1.getName().compareToIgnoreCase(person2.getName()))
                 .collect(Collectors.toList());
-
     }
 
     @Override
@@ -137,19 +123,6 @@ public class CollectionManagerImpl implements CollectionManager {
         }
         persons.remove(personToRemove);
         return true;
-    }
-
-    /**
-     * Set up collection manager
-     */
-    private void setup() {
-        for (Person personInQuestion : persons) {
-            if (EntityValidator.isEntityValid(personInQuestion)) {
-                personInQuestion.setId(currentID++);
-            } else {
-                throw new IllegalArgumentException("Person' field value is invalid.");
-            }
-        }
     }
 }
 

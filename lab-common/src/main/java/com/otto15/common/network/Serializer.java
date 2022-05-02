@@ -8,13 +8,13 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
-public final class Serializer {
+public class Serializer {
 
-    private Serializer() {
+    public Serializer() {
 
     }
 
-    public static byte[] serialize(Serializable objectToSerialize) throws IOException {
+    public byte[] serialize(Serializable objectToSerialize) throws IOException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutput objectOutput = new ObjectOutputStream(byteArrayOutputStream);
         objectOutput.writeObject(objectToSerialize);
@@ -22,7 +22,7 @@ public final class Serializer {
         return byteArrayOutputStream.toByteArray();
     }
 
-    public static Serializable deserialize(byte[] serializedObject) throws IOException {
+    public Serializable deserialize(byte[] serializedObject) throws IOException {
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(serializedObject);
         ObjectInputStream objectInput = new ObjectInputStream(byteArrayInputStream);
         try {

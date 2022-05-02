@@ -4,6 +4,7 @@ import com.otto15.common.controllers.CommandManager;
 import com.otto15.common.entities.Person;
 import com.otto15.common.entities.PersonLoader;
 import com.otto15.common.entities.User;
+import com.otto15.common.exceptions.EndOfStreamException;
 import com.otto15.common.network.Request;
 import com.otto15.common.network.Response;
 import com.otto15.common.utils.DataNormalizer;
@@ -12,16 +13,17 @@ import java.io.IOException;
 
 public class UpdateCommand extends AbstractCommand {
 
-    public UpdateCommand() {
-        super("update", "updates person value", 1);
+    public UpdateCommand(CommandManager commandManager) {
+        super(commandManager, "update", "updates person value", 1);
     }
 
     @Override
-    public Object[] readArgs(Object[] args) {
+    public Object[] readArgs(Object[] args) throws EndOfStreamException {
         try {
             long id = Long.parseLong((String) args[0]);
             User user = (User) args[1];
-            Response response = CommandManager.getNetworkListener().listen(new Request(new FindByIdCommand(), new Object[]{id, user}));
+            Response response = getCommandManager().getNetworkListener()
+                    .listen(new Request(new FindByIdCommand(getCommandManager()), new Object[]{id, user}));
             if (response.getMessage() == null) {
                 System.out.println("No person found with such id.");
                 return null;
@@ -46,10 +48,10 @@ public class UpdateCommand extends AbstractCommand {
         Person updatedPerson = (Person) args[0];
         User user = (User) args[1];
         updatedPerson.setAuthor(user.getLogin());
-        if (CommandManager.getDBWorker().updatePerson(updatedPerson) <= 0) {
+        if (getCommandManager().getDBWorker().updatePerson(updatedPerson) <= 0) {
             return new Response("Could not update person because of DB problems.");
         }
-        CommandManager.getCollectionManager().update(updatedPerson);
+        getCommandManager().getCollectionManager().update(updatedPerson);
         return new Response("Person successfully updated!");
     }
 }

@@ -1,6 +1,7 @@
 package com.otto15.common.commands;
 
 import com.otto15.common.controllers.CommandListener;
+import com.otto15.common.controllers.CommandManager;
 import com.otto15.common.network.Response;
 
 import java.io.FileReader;
@@ -15,8 +16,8 @@ public class ExecuteScriptCommand extends AbstractCommand {
 
     private static final Set<String> FILE_HISTORY = new HashSet<>();
 
-    public ExecuteScriptCommand() {
-        super("execute_script", "executes the script with commands", 1);
+    public ExecuteScriptCommand(CommandManager commandManager) {
+        super(commandManager, "execute_script", "executes the script with commands", 1);
     }
 
     @Override
@@ -26,7 +27,7 @@ public class ExecuteScriptCommand extends AbstractCommand {
             return new Response("There is a problem: script will loop.");
         } else {
             try {
-                CommandListener listenerFromFile = new CommandListener(new FileReader(fileName));
+                CommandListener listenerFromFile = new CommandListener(new FileReader(fileName), getCommandManager(), true);
                 FILE_HISTORY.add(fileName);
                 listenerFromFile.run();
             } catch (IOException e) {

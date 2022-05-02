@@ -4,6 +4,7 @@ import com.otto15.common.controllers.CommandManager;
 import com.otto15.common.entities.Person;
 import com.otto15.common.entities.PersonLoader;
 import com.otto15.common.entities.User;
+import com.otto15.common.exceptions.EndOfStreamException;
 import com.otto15.common.network.Response;
 
 import java.io.IOException;
@@ -13,12 +14,12 @@ import java.util.stream.Collectors;
 
 public class RemoveGreaterCommand extends AbstractCommand {
 
-    public RemoveGreaterCommand() {
-        super("remove_greater", "remove all elements greater than given", 0);
+    public RemoveGreaterCommand(CommandManager commandManager) {
+        super(commandManager, "remove_greater", "remove all elements greater than given", 0);
     }
 
     @Override
-    public Object[] readArgs(Object[] args) {
+    public Object[] readArgs(Object[] args) throws EndOfStreamException {
         try {
             Person comparedPerson = PersonLoader.loadPerson();
             return new Object[]{comparedPerson, args[0]};
@@ -31,14 +32,14 @@ public class RemoveGreaterCommand extends AbstractCommand {
     @Override
     public Response execute(Object[] args) {
         User user = (User) args[1];
-        int collectionLen = CommandManager.getCollectionManager().getPersons().size();
-        List<Person> personsToDelete = CommandManager.getCollectionManager().getPersons().stream().filter(person -> (Objects.equals(person.getAuthor(), user.getLogin()) && person.compareTo((Person) args[0]) > 0)).collect(Collectors.toList());
-        for (Person personToDelete: personsToDelete) {
-            if (CommandManager.getDBWorker().deletePersonById(personToDelete.getId()) < 0) {
+        int collectionLen = getCommandManager().getCollectionManager().getPersons().size();
+        List<Person> personsToDelete = getCommandManager().getCollectionManager().getPersons().stream().filter(person -> (Objects.equals(person.getAuthor(), user.getLogin()) && person.compareTo((Person) args[0]) > 0)).collect(Collectors.toList());
+        for (Person personToDelete : personsToDelete) {
+            if (getCommandManager().getDBWorker().deletePersonById(personToDelete.getId()) < 0) {
                 return new Response("Could not delete because of DB problems.");
             }
-            CommandManager.getCollectionManager().remove(personToDelete);
+            getCommandManager().getCollectionManager().remove(personToDelete);
         }
-        return new Response((collectionLen - CommandManager.getCollectionManager().getPersons().size()) + " object(s) was deleted.");
+        return new Response((collectionLen - getCommandManager().getCollectionManager().getPersons().size()) + " object(s) was deleted.");
     }
 }

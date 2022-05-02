@@ -5,6 +5,7 @@ import com.otto15.client.ConnectionHandler;
 import com.otto15.common.network.NetworkListener;
 import com.otto15.common.network.Request;
 import com.otto15.common.network.Response;
+import com.otto15.common.network.Serializer;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,9 +29,11 @@ public final class ClientNetworkListener implements NetworkListener {
         }
         if (connectionHandler.isOpen()) {
             try {
-                ClientDispatcher.send(request, connectionHandler.getOutputStream());
+                Serializer serializer = new Serializer();
+                ClientDispatcher clientDispatcher = new ClientDispatcher(serializer);
+                clientDispatcher.send(request, connectionHandler.getOutputStream());
                 connectionHandler.getSocket().setSoTimeout(TIMEOUT);
-                response = ClientDispatcher.receive(connectionHandler.getInputStream(), connectionHandler.getSocket().getReceiveBufferSize());
+                response = clientDispatcher.receive(connectionHandler.getInputStream(), connectionHandler.getSocket().getReceiveBufferSize());
             } catch (IOException e) {
                 System.out.println(e.getMessage());
                 connectionHandler.close();

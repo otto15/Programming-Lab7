@@ -2,10 +2,17 @@ package com.otto15.server;
 
 
 import com.otto15.common.network.Request;
-import com.otto15.common.network.RequestExecutor;
+import com.otto15.server.channels.ChannelState;
+import com.otto15.server.response.ResponseSender;
+import com.otto15.server.logging.LogConfig;
+import com.otto15.server.request.RequestExecutor;
 import com.otto15.common.network.Serializer;
-import com.otto15.common.state.State;
+import com.otto15.common.state.PerformanceState;
+import com.otto15.server.request.RequestReader;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -13,24 +20,27 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.InputMismatchException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 
 
 public final class ConnectionHandler implements Runnable {
 
-    private static final int STANDARD_BUFFER_SIZE = 1024;
     private static final int SELECT_DELAY = 1000;
-    private final Map<SocketChannel, ByteBuffer> channels = new HashMap<>();
-
+    private final Map<SocketChannel, ByteBuffer> channels = Collections.synchronizedMap(new HashMap<>());
+    private final ForkJoinPool forkJoinPool = new ForkJoinPool((int) (Runtime.getRuntime().availableProcessors() * 0.5 * (1 + 10)));
     private final Selector selector;
     private final ServerSocketChannel serverChannel;
     private final RequestExecutor requestExecutor;
+    private final Map<SocketChannel, ChannelState> channelsState = Collections.synchronizedMap(new HashMap<>());
+    private final PerformanceState performanceState;
 
-    public ConnectionHandler(RequestExecutor requestExecutor) throws IOException {
+    public ConnectionHandler(RequestExecutor requestExecutor, PerformanceState performanceState) throws IOException {
+        this.performanceState = performanceState;
         this.requestExecutor = requestExecutor;
         selector = Selector.open();
         serverChannel = ServerSocketChannel.open();
@@ -38,22 +48,25 @@ public final class ConnectionHandler implements Runnable {
             try {
                 serverChannel.socket().bind(new InetSocketAddress(inputPort()));
                 break;
-            } catch (IOException e) {
-                System.out.println(e.getMessage());
             } catch (IllegalArgumentException e) {
-                System.out.println("Port must be in the range from 0 to 65535");
+                System.out.println("Port must be in the range from 0 to 65535.");
+            } catch (IOException e) {
+                System.out.println("Port is already in use.");
             }
         }
-        System.out.println("Server using port - " + serverChannel.socket().getLocalPort());
     }
 
-    private int inputPort() {
+    private int inputPort() throws IOException {
         while (true) {
             try {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
                 System.out.println("Enter port:");
-                Scanner sc = new Scanner(System.in);
-                return sc.nextInt();
-            } catch (InputMismatchException e) {
+                String port = reader.readLine();
+                if (port == null) {
+                    throw new IOException();
+                }
+                return Integer.parseInt(port);
+            } catch (NumberFormatException e) {
                 System.out.println("Enter number");
             }
         }
@@ -65,8 +78,10 @@ public final class ConnectionHandler implements Runnable {
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
             listen();
         } catch (IOException e) {
-            close();
+            e.printStackTrace();
         }
+        close();
+        LogConfig.LOGGER.info("Server closed");
     }
 
     private void close() {
@@ -79,86 +94,75 @@ public final class ConnectionHandler implements Runnable {
     }
 
     public void listen() throws IOException {
-        while (State.getPerformanceStatus()) {
-            SelectionKey key = null;
-            try {
-                int numberOfKeys = selector.select(SELECT_DELAY);
-                if (numberOfKeys != 0) {
-                    Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
-                    while (keys.hasNext()) {
-                        key = keys.next();
-                        keys.remove();
-                        if (key.isValid()) {
-                            if (key.isAcceptable()) {
-                                accept(key);
-                            } else if (key.isReadable()) {
-                                read(key);
-                            } else if (key.isWritable()) {
-                                write(key);
-                            }
+        while (performanceState.getPerformanceStatus()) {
+            selector.select(SELECT_DELAY);
+            Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
+
+            while (keys.hasNext()) {
+                SelectionKey key = keys.next();
+                keys.remove();
+                try {
+                    if (key.isValid()) {
+                        if (key.isAcceptable()) {
+                            accept(key);
+                        } else if (key.isReadable()) {
+                            read(key);
+                        } else if (key.isWritable()) {
+                            write(key);
                         }
                     }
-                }
-            } catch (IOException e) {
-                if (key != null) {
-                    kill((SocketChannel) key.channel());
+                } catch (IOException e) {
+                    if (key.channel().isOpen()) {
+                        kill((SocketChannel) key.channel());
+                    }
                 }
             }
         }
     }
 
-    private SocketAddress accept(SelectionKey key) throws IOException {
+    private void accept(SelectionKey key) throws IOException {
         SocketChannel channel = serverChannel.accept();
+        channels.put(channel, ByteBuffer.allocate(0));
         SocketAddress address = channel.getRemoteAddress();
         channel.configureBlocking(false);
         channel.register(selector, SelectionKey.OP_READ);
-        channels.put(channel, ByteBuffer.allocate(0));
-        return address;
+        channelsState.put(channel, ChannelState.READY_TO_READ);
+        LogConfig.LOGGER.info("New connection accepted {}", address);
     }
 
-    private Request read(SelectionKey key) throws IOException {
+    private void read(SelectionKey key) throws IOException {
         SocketChannel channel = (SocketChannel) key.channel();
-        ByteBuffer buffer = ByteBuffer.allocate(STANDARD_BUFFER_SIZE);
-        int bytesRead = channel.read(buffer);
-        //System.out.println(bytesRead);
-        if (bytesRead == -1) {
-            kill(channel);
-            return null;
+        if (channelsState.get(channel) == ChannelState.READY_TO_READ) {
+            channelsState.put(channel, ChannelState.READING);
+            new Thread(new RequestReader(channel, channels, selector, channelsState))
+                    .start();
         }
-        ByteBuffer newBuffer = ByteBuffer.allocate(channels.get(channel).capacity() + bytesRead);
-        newBuffer.put(channels.get(channel).array());
-        newBuffer.put(ByteBuffer.wrap(buffer.array(), 0, bytesRead));
-        //System.out.println(Arrays.toString(newBuffer.array()));
-        channels.put(channel, newBuffer);
-
-        Request request = (Request) Serializer.deserialize(channels.get(channel).array());
-
-        if (request != null) {
-            channels.put(channel, ByteBuffer.wrap(Serializer.serialize(requestExecutor.execute(request))));
-            channel.register(selector, SelectionKey.OP_WRITE);
+        if (channels.get((SocketChannel) key.channel()) == null) {
+            throw new IOException();
         }
-        return request;
     }
 
-    private int write(SelectionKey key) throws IOException {
+    private void write(SelectionKey key) throws IOException {
         SocketChannel channel = (SocketChannel) key.channel();
-        ByteBuffer buffer = channels.get(channel);
-        int responseLen = 0;
-        int bytesWritten = channel.write(buffer);
-        responseLen += bytesWritten;
-        while (buffer.hasRemaining()) {
-            bytesWritten = channel.write(buffer);
-            responseLen += bytesWritten;
+
+        if (channelsState.get(channel) == ChannelState.READY_TO_WRITE) {
+            channelsState.put(channel, ChannelState.WRITING);
+            Serializer serializer = new Serializer();
+
+            Request request = (Request) serializer.deserialize(channels.get((SocketChannel) key.channel()).array());
+            ResponseSender responseSender = new ResponseSender(channel, channels, selector, channelsState);
+            CompletableFuture.supplyAsync(() -> requestExecutor.execute(request), forkJoinPool)
+                    .thenAcceptAsync(responseSender::send, forkJoinPool);
         }
-        channels.put(channel, ByteBuffer.allocate(0));
-        channel.register(selector, SelectionKey.OP_READ);
-        return responseLen;
+        if (channels.get((SocketChannel) key.channel()) == null) {
+            throw new IOException();
+        }
     }
 
-    private SocketAddress kill(SocketChannel channel) throws IOException {
+    private void kill(SocketChannel channel) throws IOException {
         SocketAddress address = channel.getRemoteAddress();
         channels.remove(channel);
         channel.close();
-        return address;
+        LogConfig.LOGGER.info("Connection closed {}", address);
     }
 }

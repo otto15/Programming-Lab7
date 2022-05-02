@@ -1,5 +1,7 @@
 package com.otto15.common.commands;
 
+import com.otto15.common.controllers.CommandManager;
+import com.otto15.common.exceptions.EndOfStreamException;
 import com.otto15.common.network.Response;
 
 import java.io.Serializable;
@@ -13,11 +15,17 @@ public abstract class AbstractCommand implements Serializable {
     private final String name;
     private final String description;
     private final int inlineArgsCount;
+    private transient CommandManager commandManager;
 
-    public AbstractCommand(String name, String description, int inlineArgsCount) {
+    public AbstractCommand(CommandManager commandManager, String name, String description, int inlineArgsCount) {
         this.name = name;
         this.description = description;
         this.inlineArgsCount = inlineArgsCount;
+        this.commandManager = commandManager;
+    }
+
+    public void setCommandManager(CommandManager commandManager) {
+        this.commandManager = commandManager;
     }
 
     /**
@@ -27,7 +35,11 @@ public abstract class AbstractCommand implements Serializable {
      */
     public abstract Response execute(Object[] args);
 
-    public Object[] readArgs(Object[] args) {
+    public CommandManager getCommandManager() {
+        return commandManager;
+    }
+
+    public Object[] readArgs(Object[] args) throws EndOfStreamException {
         return new Object[]{args[0]};
     }
 

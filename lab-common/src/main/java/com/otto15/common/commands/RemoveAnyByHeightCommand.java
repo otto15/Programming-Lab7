@@ -7,8 +7,8 @@ import com.otto15.common.network.Response;
 
 public class RemoveAnyByHeightCommand extends AbstractCommand {
 
-    public RemoveAnyByHeightCommand() {
-        super("remove_any_by_height", "removes collection element by height", 1);
+    public RemoveAnyByHeightCommand(CommandManager commandManager) {
+        super(commandManager, "remove_any_by_height", "removes collection element by height", 1);
     }
 
     @Override
@@ -24,14 +24,14 @@ public class RemoveAnyByHeightCommand extends AbstractCommand {
 
     @Override
     public Response execute(Object[] args) {
-        Person deletedPerson = CommandManager.getCollectionManager().findAnyByHeight((Long) args[0], ((User) args[1]).getLogin());
+        Person deletedPerson = getCommandManager().getCollectionManager().findAnyByHeight((Long) args[0], ((User) args[1]).getLogin());
         if (deletedPerson.getId() == -1) {
             return new Response("No person found with such height.");
         }
-        if (CommandManager.getDBWorker().deletePersonById(deletedPerson.getId()) < 0) {
+        if (getCommandManager().getDBWorker().deletePersonById(deletedPerson.getId()) < 0) {
             return new Response("Could not delete person because of DB problems");
         }
-        CommandManager.getCollectionManager().remove(deletedPerson);
+        getCommandManager().getCollectionManager().remove(deletedPerson);
         return new Response("Person[" + deletedPerson.getId() + "] " + deletedPerson.getName() + " was removed.");
 
     }
