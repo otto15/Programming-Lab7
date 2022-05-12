@@ -1,0 +1,15 @@
+03/05/2022 00:41:13.759 [main] INFO  com.otto15.server.logging.LogConfig - DB initialization succeeded
+03/05/2022 00:41:16.673 [main] INFO  com.otto15.server.logging.LogConfig - Server launched on port - 1
+03/05/2022 00:41:27.648 [main] INFO  com.otto15.server.logging.LogConfig - New connection accepted /127.0.0.1:52698
+03/05/2022 00:41:27.665 [Thread-1] INFO  com.otto15.server.logging.LogConfig - Got from /127.0.0.1:52698
+03/05/2022 00:41:28.770 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - user with id - 1 found
+03/05/2022 00:41:28.792 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - Sent response 1450 bytes to /127.0.0.1:52698
+03/05/2022 00:42:06.752 [Thread-2] WARN  com.otto15.server.logging.LogConfig - There is still data to read
+03/05/2022 00:42:06.757 [Thread-3] INFO  com.otto15.server.logging.LogConfig - Got from /127.0.0.1:52698
+03/05/2022 00:42:07.843 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - user with id - 1 found
+03/05/2022 00:42:07.978 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - new person added to database with id - 4
+03/05/2022 00:42:07.979 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - Sent response 201 bytes to /127.0.0.1:52698
+03/05/2022 00:42:09.826 [Thread-4] INFO  com.otto15.server.logging.LogConfig - Got from /127.0.0.1:52698
+03/05/2022 00:42:10.917 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - user with id - 1 found
+03/05/2022 00:42:10.919 [ForkJoinPool-1-worker-115] INFO  com.otto15.server.logging.LogConfig - Sent response 1615 bytes to /127.0.0.1:52698
+03/05/2022 00:50:13.522 [main] INFO  com.otto15.server.logging.LogConfig - Server closed
